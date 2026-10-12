@@ -1,0 +1,9 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+logging:
+  level:
+    com.movietracker.movieservice: DEBUG
+    org.springframework.data.mongodb.core.MongoTemplate: DEBUG

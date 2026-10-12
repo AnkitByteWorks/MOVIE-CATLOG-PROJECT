@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="watchlog-service"/>
+
+    <!-- Dev Console Appender with ANSI colors -->
+    <appender name="DEV_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%blue(%thread)] %cyan(%logger{36}) : %msg%n%throwable</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Docker/Prod Structured Console Appender with MDC fields -->
+    <appender name="STRUCTURED_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>{"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}","service":"${appName}","level":"%-5level","thread":"%thread","logger":"%logger{36}","message":"%replace(%msg){'[\r\n\t]', ' '}","traceId":"%X{traceId:-}","spanId":"%X{spanId:-}"}%n%throwable</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Profile: dev -->
+    <springProfile name="dev">
+        <logger name="com.movietracker" level="DEBUG"/>
+        <logger name="org.hibernate.SQL" level="DEBUG"/>
+        <logger name="org.hibernate.orm.jdbc.bind" level="TRACE"/>
+        <root level="INFO">
+            <appender-ref ref="DEV_CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Profile: docker, prod -->
+    <springProfile name="docker,prod">
+        <logger name="com.movietracker" level="INFO"/>
+        <root level="INFO">
+            <appender-ref ref="STRUCTURED_CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Default fallback profile if none active -->
+    <springProfile name="!dev &amp; !docker &amp; !prod">
+        <logger name="com.movietracker" level="DEBUG"/>
+        <root level="INFO">
+            <appender-ref ref="DEV_CONSOLE"/>
+        </root>
+    </springProfile>
+
+</configuration>

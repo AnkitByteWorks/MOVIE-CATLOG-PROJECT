@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: watchlog-service-test
+  datasource:
+    url: jdbc:h2:mem:watchlogtest;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+  cache:
+    type: none
+  kafka:
+    bootstrap-servers: localhost:9092
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+app:
+  jwt:
+    secret: dGVzdC1zZWNyZXQta2V5LWZvci13YXRjaGxvZy1zZXJ2aWNlLXRlc3RzLTEyMzQ1Njc4
+    access-token-ttl: PT15M
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    allowed-headers:
+      - "*"
+    allow-credentials: true
+  clients:
+    user-service-url: http://localhost:8081
+    movie-service-url: http://localhost:8082
+  stats:
+    cache-ttl: PT15M

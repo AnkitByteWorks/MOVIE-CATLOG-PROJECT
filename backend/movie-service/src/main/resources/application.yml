@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: movie-service
+  main:
+    allow-bean-definition-overriding: true
+  threads:
+    virtual:
+      enabled: true
+  mongodb:
+    uri: ${MONGO_URI:mongodb://movietracker:movietracker@localhost:27017/movietracker_movies?authSource=admin}
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://movietracker:movietracker@localhost:27017/movietracker_movies?authSource=admin}
+      auto-index-creation: false
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  cache:
+    type: redis
+
+server:
+  port: ${SERVER_PORT:8082}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    register-with-eureka: ${EUREKA_REGISTER:false}
+    fetch-registry: ${EUREKA_FETCH:false}
+
+app:
+  cache:
+    ttls:
+      movieSearch: 6h
+      movieDetails: 24h
+      trending: 2h
+      genres: 7d
+  image:
+    base-url: https://image.tmdb.org/t/p
+    poster-size: w500
+    backdrop-size: w1280
+  trending:
+    sync-cron: "${TRENDING_SYNC_CRON:0 0 4 * * ?}"
+    external-feed-url: "${TRENDING_FEED_URL:}"
+    external-feed-timeout-seconds: 3
+    cutoff-year-india: 2024
+    cutoff-year-global: 2024
+    min-votes-global: 0
+    languages-india:
+      - hi
+      - te
+      - ta
+      - ml
+      - kn
+      - pa
+      - bn

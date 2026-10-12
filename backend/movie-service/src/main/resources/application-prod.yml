@@ -1,0 +1,20 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+server:
+  error:
+    include-stacktrace: never
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+logging:
+  level:
+    root: WARN
+    com.movietracker.movieservice: INFO

@@ -1,0 +1,321 @@
+# ====================================================================
+# Movie Tracker — Local Infrastructure Layer
+# Production-shaped, optimized for local developer experience
+# ====================================================================
+
+services:
+  # --------------------------------------------------------
+  # SERVICE: mysql (Relational DB for users, watchlogs, etc.)
+  # --------------------------------------------------------
+  mysql:
+    image: mysql:8.4
+    container_name: movietracker-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./infrastructure/mysql/init:/docker-entrypoint-initdb.d:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_connections=200
+      - --innodb_buffer_pool_size=256M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: redis (Distributed cache & token invalidation)
+  # --------------------------------------------------------
+  redis:
+    image: redis:7.4-alpine
+    container_name: movietracker-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: kafka (Event streaming in KRaft mode — NO Zookeeper)
+  # --------------------------------------------------------
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: movietracker-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"    # Host access
+      - "29092:29092"  # Internal docker network access
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:9093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: "4L622nShTZaJvtjeqqzsXX"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: kafka-ui (Web UI for viewing topics & messages)
+  # --------------------------------------------------------
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: movietracker-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_READONLY: "false"
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: mongodb (Document store for movie catalogs & TMDb data)
+  # --------------------------------------------------------
+  mongodb:
+    image: mongo:7.0
+    container_name: movietracker-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: movietracker_movies
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./infrastructure/mongo/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: mongo-express (Web-based MongoDB management GUI)
+  # --------------------------------------------------------
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: movietracker-mongo-express
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    ports:
+      - "8085:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/
+      ME_CONFIG_BASICAUTH: "false"
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: redis-insight (GUI for Redis caching & keyspace)
+  # --------------------------------------------------------
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: movietracker-redis-insight
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    volumes:
+      - redis-insight:/data
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: prometheus (Metrics aggregator & time-series DB)
+  # --------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: movietracker-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: grafana (Metrics visualization dashboards)
+  # --------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: movietracker-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: movie-service (Catalog, TMDB sync, Redis cache)
+  # --------------------------------------------------------
+  movie-service:
+    build:
+      context: ./movie-service
+      dockerfile: Dockerfile
+    container_name: movietracker-movie-service
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/movietracker_movies?authSource=admin
+      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/movietracker_movies?authSource=admin
+      SPRING_DATA_MONGODB_AUTO_INDEX_CREATION: "false"
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/movietracker_movies?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      EUREKA_URL: http://discovery-server:8761/eureka
+      SERVER_PORT: 8082
+    ports:
+      - "8082:8082"
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # SERVICE: watchlog-service (Watch history, stats, Kafka streaming)
+  # --------------------------------------------------------
+  watchlog-service:
+    build:
+      context: ./watchlog-service
+      dockerfile: Dockerfile
+    container_name: movietracker-watchlog-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:mysql://mysql:3306/movietracker_watchlog?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:29092
+      USER_SERVICE_URL: http://user-service:8081
+      MOVIE_SERVICE_URL: http://movie-service:8082
+      SERVER_PORT: 8083
+    ports:
+      - "8083:8083"
+    networks:
+      - movietracker-net
+
+  # --------------------------------------------------------
+  # FUTURE SERVICE: user-service (Slot for microservice container)
+  # --------------------------------------------------------
+  # user-service:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: movietracker-user-service
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: docker
+  #     DB_URL: jdbc:mysql://mysql:3306/movietracker_user?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+  #     DB_USER: ${MYSQL_USER}
+  #     DB_PASSWORD: ${MYSQL_PASSWORD}
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - movietracker-net
+
+volumes:
+  mysql-data:
+    name: movietracker-mysql-data
+  redis-data:
+    name: movietracker-redis-data
+  kafka-data:
+    name: movietracker-kafka-data
+  mongo-data:
+    name: movietracker-mongo-data
+  redis-insight:
+    name: movietracker-redis-insight
+  prometheus-data:
+    name: movietracker-prometheus-data
+  grafana-data:
+    name: movietracker-grafana-data
+
+networks:
+  movietracker-net:
+    driver: bridge
+    name: movietracker-net

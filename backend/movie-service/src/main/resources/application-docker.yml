@@ -1,0 +1,23 @@
+spring:
+  config:
+    activate:
+      on-profile: docker
+  mongodb:
+    uri: ${MONGO_URI:mongodb://movietracker:movietracker@mongodb:27017/movietracker_movies?authSource=admin}
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://movietracker:movietracker@mongodb:27017/movietracker_movies?authSource=admin}
+      auto-index-creation: false
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+
+logging:
+  level:
+    com.movietracker.movieservice: INFO
+    org.springframework.web: INFO

@@ -1,0 +1,122 @@
+spring:
+  application:
+    name: user-service
+  config:
+    import: "optional:configserver:"
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  threads:
+    virtual:
+      enabled: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+        default_batch_fetch_size: 20
+  jackson:
+    default-property-inclusion: non_null
+    datatype:
+      datetime:
+        write-dates-as-timestamps: false
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  cache:
+    type: redis
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: user-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.movietracker.*"
+
+server:
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: ${spring.application.name}
+    version: '@project.version@'
+    java: 25
+    spring-boot: 4.1.1
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+logging:
+  level:
+    root: INFO
+    com.movietracker: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-min-256-bits-long-secret-key-here-ok}
+    access-token-ttl: PT15M
+    refresh-token-ttl: P7D
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:3000
+    allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+    allowed-headers: ["*"]
+    allow-credentials: true
+  tmdb:
+    base-url: https://api.themoviedb.org/3
+    api-key: ${TMDB_API_KEY:placeholder}

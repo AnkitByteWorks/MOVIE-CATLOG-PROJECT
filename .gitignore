@@ -1,0 +1,35 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE & Editor files
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / Scratch
+scratch/
+*.lock

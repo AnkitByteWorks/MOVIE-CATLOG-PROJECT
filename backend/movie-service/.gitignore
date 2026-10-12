@@ -1,0 +1,40 @@
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IDE and Editors ###
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+.apt_generated
+.springBeans
+.sts4-cache
+
+### Environment and Secrets ###
+.env
+.env.local
+
+### Logs and Dumps ###
+*.log
+logs/
+heapdump.hprof
+replay_pid*.log
+
+### OS Files ###
+.DS_Store
+Thumbs.db
+
+### Build and Artifacts ###
+node_modules/
+build/
+dist/
+*.class
+NOTES.md
