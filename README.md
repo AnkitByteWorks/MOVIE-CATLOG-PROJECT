@@ -51,36 +51,32 @@ Originally conceived as a proxy to The Movie Database (TMDB) API, CinePulse unde
 CinePulse decouples business domains into specialized, single-responsibility services connected via asynchronous message queues, internal REST clients, and shared distributed caches.
 
 ```
-                           ┌──────────────────────────────────────────────┐
-                           │            CinePulse Frontend UI             │
-                           │       Next.js 16 / React 19 / TypeScript     │
-                           │             (Port 3000 / SSR + CSR)          │
-                           └──────────────────────┬───────────────────────┘
-                                                  │
-                 ┌────────────────────────────────┼──────────────────────────────┐
-                 │ HTTP (Auth / Profiles)         │ HTTP (Catalog / Search)      │ HTTP (Watchlogs / Stats)
-                 ▼                                ▼                              ▼
-    ┌─────────────────────────┐      ┌─────────────────────────┐    ┌─────────────────────────┐
-    │      user-service       │      │      movie-service      │    │    watchlog-service     │
-    │ Spring Boot 4.1.1 / :8081│      │ Spring Boot 4.1.1 / :8082│    │ Spring Boot 4.1.1 / :8083│
-    └────────────┬────────────┘      └────────────┬────────────┘    └────────────┬────────────┘
-                 │                                │                              │
-          ┌──────┴──────┐                  ┌──────┴──────┐                ┌──────┴──────┐
-          │             │                  │             │                │             │
-          ▼             ▼                  ▼             ▼                ▼             ▼
-    ┌───────────┐ ┌───────────┐      ┌───────────┐ ┌───────────┐    ┌───────────┐ ┌───────────┐
-    │ MySQL 8.4 │ │ Redis 7.4 │      │  MongoDB  │ │ Redis 7.4 │    │ MySQL 8.4 │ │Kafka 3.9  │
-    │   User    │ │  Session  │      │    7.0    │ │   Query   │    │ Watchlogs │ │  KRaft    │
-    │  Records  │ │   Cache   │      │ 1.67M Docs│ │   Cache   │    │  & Stats  │ │  Cluster  │
-    └───────────┘ └───────────┘      └───────────┘ └───────────┘    └───────────┘ └─────┬─────┘
-                                                                                        │
-                                                                       Kafka Consumer   │
-                                                                     Topic: watch-events│
-                                                                                        ▼
-                                                                            ┌───────────────────────┐
-                                                                            │ Downstream Consumers  │
-                                                                            │ (Analytics & Auditing)│
-                                                                            └───────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│                   CinePulse Frontend                   │
+│           Next.js 16 / React 19 / TypeScript           │
+│                 (Port 3000 / App Router)               │
+└───────────────────────────┬────────────────────────────┘
+                            │ REST / JSON
+        ┌───────────────────┼───────────────────┐
+        ▼                   ▼                   ▼
+┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+│ user-service  │   │ movie-service │   │watchlog-serv. │
+│   Port 8081   │   │   Port 8082   │   │   Port 8083   │
+└───────┬───────┘   └───────┬───────┘   └───────┬───────┘
+        │                   │                   │
+    ┌───┴───┐           ┌───┴───┐           ┌───┴───┐
+    ▼       ▼           ▼       ▼           ▼       ▼
+┌───────┐┌───────┐  ┌───────┐┌───────┐  ┌───────┐┌───────┐
+│ MySQL ││ Redis │  │ Mongo ││ Redis │  │ MySQL ││ Kafka │
+│  8.4  ││  7.4  │  │  7.0  ││  7.4  │  │  8.4  ││  3.9  │
+│ Users ││Session│  │ 1.67M ││ Cache │  │ Logs  ││ KRaft │
+└───────┘└───────┘  └───────┘└───────┘  └───────┘└───┬───┘
+                                                     │
+                                             watch-events
+                                                     ▼
+┌────────────────────────────────────────────────────────┐
+│      Downstream Consumers (Analytics & Auditing)       │
+└────────────────────────────────────────────────────────┘
 ```
 
 For the comprehensive technical specification and architectural deep dive, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -204,8 +200,12 @@ cp .env.example .env
 ```
 
 Ensure `.env` contains a valid `JWT_SECRET` (minimum 64 characters):
+
+> ⚠️ **Never commit your real `.env` file.** Use `.env.example` as a template. Generate secrets with `openssl rand -hex 32`.
+
 ```env
-JWT_SECRET=c4ca4238a0b923820dcc509a6f75849b28374958293847291039485729103948
+JWT_SECRET=replace-me-with-a-random-64-character-string
+# Generate one with: openssl rand -hex 32
 MYSQL_USER=movietracker
 MYSQL_PASSWORD=movietracker
 MONGO_USER=movietracker
