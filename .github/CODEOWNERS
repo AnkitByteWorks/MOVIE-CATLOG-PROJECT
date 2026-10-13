@@ -1,0 +1,15 @@
+# All files owned by repo owner
+* @AnkitByteWorks
+
+# Backend
+/backend/user-service/ @AnkitByteWorks
+/backend/movie-service/ @AnkitByteWorks
+/backend/watchlog-service/ @AnkitByteWorks
+
+# Frontend
+/frontend/ @AnkitByteWorks
+
+# Infrastructure
+/docker-compose.yml @AnkitByteWorks
+/infrastructure/ @AnkitByteWorks
+/.github/ @AnkitByteWorks
