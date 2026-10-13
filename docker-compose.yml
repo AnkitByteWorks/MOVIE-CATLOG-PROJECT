@@ -267,6 +267,7 @@ services:
       KAFKA_BOOTSTRAP: kafka:29092
       USER_SERVICE_URL: http://user-service:8081
       MOVIE_SERVICE_URL: http://movie-service:8082
+      JWT_SECRET: ${JWT_SECRET}
       SERVER_PORT: 8083
     ports:
       - "8083:8083"
@@ -318,12 +319,20 @@ services:
       - movie-service
       - watchlog-service
     environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: 3000
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8082
       NEXT_PUBLIC_USER_API_URL: http://localhost:8081
       NEXT_PUBLIC_WATCHLOG_API_URL: http://localhost:8083
       NEXT_PUBLIC_IMAGE_BASE_URL: https://image.tmdb.org/t/p
     ports:
       - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - movietracker-net
 
