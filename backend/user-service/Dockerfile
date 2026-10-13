@@ -6,7 +6,7 @@ COPY mvnw pom.xml ./
 RUN ./mvnw dependency:go-offline -B
 COPY src ./src
 RUN ./mvnw clean package -DskipTests -B && \
-    java -Djarmode=layertools -jar target/*.jar extract --destination target/extracted
+    java -Djarmode=tools -jar target/*.jar extract --layers --launcher --destination target/extracted
 
 # Stage 2 — runtime
 FROM eclipse-temurin:25-jre-alpine
