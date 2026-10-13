@@ -41,8 +41,24 @@ jobs:
         with:
           languages: ${{ matrix.language }}
 
-      - name: Autobuild
+      - name: Autobuild (JS/TS)
+        if: matrix.language == 'javascript-typescript'
         uses: github/codeql-action/autobuild@v3
+
+      - name: Build Java services (CodeQL)
+        if: matrix.language == 'java-kotlin'
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -e
+          for service in user-service movie-service watchlog-service; do
+            echo "::group::Building backend/$service"
+            cd "backend/$service"
+            chmod +x mvnw
+            ./mvnw clean compile -DskipTests -B
+            cd "${{ github.workspace }}"
+            echo "::endgroup::"
+          done
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

@@ -175,20 +175,38 @@ class MovieServiceImplTest {
     }
 
     @Test
-    @DisplayName("getTrending should query MongoDB by popularity descending")
+    @DisplayName("getTrending should return global trending movies")
     void getTrending_shouldReturnPopularMovies() {
         int page = 1;
-        when(cachedLookupService.getCachedTrendingMovies(eq("day"), eq(page), any()))
+        // getTrending("day", page) delegates to getTrendingGlobal(page) which calls getCachedTrendingGlobal
+        when(cachedLookupService.getCachedTrendingGlobal(eq(page), any()))
                 .thenAnswer(invocation -> {
-                    Supplier<PagedResponse<MovieSummaryResponse>> supplier = invocation.getArgument(2);
+                    Supplier<PagedResponse<MovieSummaryResponse>> supplier = invocation.getArgument(1);
                     return supplier.get();
                 });
 
+        when(trendingSyncService.getCachedGlobalIds()).thenReturn(List.of(155L));
+
+        Movie movie = Movie.builder().tmdbId(155L).title("The Dark Knight").popularity(150.0).build();
+        when(movieRepository.findByTmdbIdInAndAdultNotTrue(List.of(155L)))
+                .thenReturn(List.of(movie));
+
+        PagedResponse<MovieSummaryResponse> result = movieService.getTrending("day", page);
+
+        assertThat(result).isNotNull();
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.content().get(0).title()).isEqualTo("The Dark Knight");
+    }
+
+    @Test
+    @DisplayName("getPopular should query MongoDB by popularity descending")
+    void getPopular_shouldReturnPopularMovies() {
+        int page = 1;
         Movie movie = Movie.builder().tmdbId(155L).title("The Dark Knight").popularity(150.0).build();
         when(movieRepository.findAllByOrderByPopularityDesc(PageRequest.of(0, 20)))
                 .thenReturn(new PageImpl<>(List.of(movie), PageRequest.of(0, 20), 1));
 
-        PagedResponse<MovieSummaryResponse> result = movieService.getTrending("day", page);
+        PagedResponse<MovieSummaryResponse> result = movieService.getPopular(page);
 
         assertThat(result).isNotNull();
         assertThat(result.content()).hasSize(1);
